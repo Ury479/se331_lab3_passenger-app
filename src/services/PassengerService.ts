@@ -1,5 +1,11 @@
 import axios from 'axios'
-import type { Passenger, Airline } from '@/types/passenger'
+import type { 
+  Passenger, 
+  Airline, 
+  CreatePassengerRequest, 
+  CreateAirlineRequest, 
+  UpdatePassengerNameRequest 
+} from '@/types/passenger'
 import { mockPassengers, mockAirlines } from '@/data/mockData'
 
 const apiClient = axios.create({
@@ -22,7 +28,7 @@ apiClient.interceptors.response.use(
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 export default {
-  // 获取乘客列表 - 支持分页，修正API路径
+  // 获取乘客列表 - 支持分页
   async getPassengers(page: number = 0, size: number = 10) {
     try {
       const response = await apiClient.get<{ totalPassengers: number; totalPages: number; data: Passenger[] }>(`/passenger?page=${page}&size=${size}`)
@@ -41,7 +47,7 @@ export default {
     }
   },
   
-  // 获取单个乘客详情 - 修正API路径
+  // 获取单个乘客详情 - 返回包含完整航空公司信息的乘客对象
   async getPassenger(id: string) {
     try {
       const response = await apiClient.get<Passenger>(`/passenger/${id}`)
@@ -58,57 +64,44 @@ export default {
     }
   },
   
-  // 创建新乘客
-  async createPassenger(passengerData: Omit<Passenger, '_id' | '__v'>) {
+  // 创建新乘客 - 使用简化的请求格式（name, trips, airline ID）
+  async createPassenger(passengerData: CreatePassengerRequest) {
     try {
       const response = await apiClient.post<Passenger>('/passenger', passengerData)
       return response
     } catch (error) {
       console.warn('API not available, simulating creation:', error)
       await delay(300)
+      // 模拟创建后返回完整的乘客对象
+      const mockAirline = mockAirlines.find(a => a._id === passengerData.airline.toString())
       const newPassenger: Passenger = {
-        ...passengerData,
         _id: Date.now().toString(),
+        name: passengerData.name,
+        trips: passengerData.trips,
+        airline: mockAirline ? [mockAirline] : [],
         __v: 0
       }
       return { data: newPassenger }
     }
   },
   
-  // 更新乘客信息 (完整更新)
-  async updatePassenger(id: string, passengerData: Omit<Passenger, '_id' | '__v'>) {
+  // 更新乘客姓名 - 只允许更新姓名
+  async updatePassengerName(id: string, nameData: UpdatePassengerNameRequest) {
     try {
-      const response = await apiClient.put<Passenger>(`/passenger/${id}`, passengerData)
+      const response = await apiClient.patch<Passenger>(`/passenger/${id}`, nameData)
       return response
     } catch (error) {
-      console.warn('API not available, simulating update:', error)
-      await delay(300)
-      const updatedPassenger: Passenger = {
-        ...passengerData,
-        _id: id,
-        __v: 0
-      }
-      return { data: updatedPassenger }
-    }
-  },
-  
-  // 部分更新乘客信息
-  async patchPassenger(id: string, partialData: Partial<Omit<Passenger, '_id' | '__v'>>) {
-    try {
-      const response = await apiClient.patch<Passenger>(`/passenger/${id}`, partialData)
-      return response
-    } catch (error) {
-      console.warn('API not available, simulating patch:', error)
+      console.warn('API not available, simulating name update:', error)
       await delay(300)
       const existingPassenger = mockPassengers.find(p => p._id === id)
       if (!existingPassenger) {
         throw new Error('Passenger not found')
       }
-      const patchedPassenger: Passenger = {
+      const updatedPassenger: Passenger = {
         ...existingPassenger,
-        ...partialData
+        name: nameData.name
       }
-      return { data: patchedPassenger }
+      return { data: updatedPassenger }
     }
   },
   
@@ -124,7 +117,7 @@ export default {
     }
   },
   
-  // 获取所有航空公司
+  // 获取所有航空公司 - 返回航空公司数组
   async getAirlines() {
     try {
       const response = await apiClient.get<Airline[]>('/airlines')
@@ -154,7 +147,7 @@ export default {
   },
   
   // 创建新航空公司
-  async createAirline(airlineData: Omit<Airline, '_id' | '__v'>) {
+  async createAirline(airlineData: CreateAirlineRequest) {
     try {
       const response = await apiClient.post<Airline>('/airlines', airlineData)
       return response
@@ -163,8 +156,7 @@ export default {
       await delay(300)
       const newAirline: Airline = {
         ...airlineData,
-        _id: Date.now().toString(),
-        __v: 0
+        _id: Date.now().toString()
       }
       return { data: newAirline }
     }
